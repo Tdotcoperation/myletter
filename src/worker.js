@@ -4,6 +4,22 @@ const PAPERS = new Set(["classic","vintage"]);
 const COLORS = new Set(["yellow","pink","mint","blue"]);
 const MAX_BODY = 10000;
 const MAX_FILES = 21;
+// Auto-create the initial schema for dashboard GitHub deployments, which may
+// provision D1 automatically and cannot run migration commands before deploy.
+const SCHEMA_SQL = "CREATE TABLE IF NOT EXISTS letters (\n  id TEXT PRIMARY KEY,\n  sender TEXT NOT NULL,\n  recipient TEXT NOT NULL,\n  title TEXT NOT NULL,\n  body TEXT NOT NULL,\n  font TEXT NOT NULL,\n  paper TEXT NOT NULL,\n  bg_asset TEXT,\n  password_salt TEXT,\n  password_hash TEXT,\n  available_at TEXT,\n  allow_reply INTEGER NOT NULL DEFAULT 1,\n  manage_hash TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  views INTEGER NOT NULL DEFAULT 0\n);\nCREATE TABLE IF NOT EXISTS assets (\n  id TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  r2_key TEXT NOT NULL UNIQUE,\n  mime TEXT NOT NULL,\n  bytes INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_assets_letter ON assets(letter_id);\nCREATE TABLE IF NOT EXISTS stickers (\n  id TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,\n  x REAL NOT NULL,\n  y REAL NOT NULL,\n  w REAL NOT NULL,\n  z INTEGER NOT NULL DEFAULT 1\n);\nCREATE INDEX IF NOT EXISTS idx_stickers_letter ON stickers(letter_id);\nCREATE TABLE IF NOT EXISTS replies (\n  id TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  body TEXT NOT NULL,\n  x REAL NOT NULL DEFAULT 0.65,\n  y REAL NOT NULL DEFAULT 0.7,\n  color TEXT NOT NULL DEFAULT 'yellow',\n  author_hash TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE INDEX IF NOT EXISTS idx_replies_letter ON replies(letter_id);\nCREATE TABLE IF NOT EXISTS access_sessions (\n  token_hash TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  expires_at INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_sessions_letter ON access_sessions(letter_id);\nCREATE TABLE IF NOT EXISTS login_attempts (\n  key TEXT PRIMARY KEY,\n  count INTEGER NOT NULL DEFAULT 0,\n  reset_at INTEGER NOT NULL\n);\n";
+const schemaInitialization = new WeakMap();
+async function ensureSchema(db) {
+  let initializing = schemaInitialization.get(db);
+  if (!initializing) {
+    initializing = (async () => {
+      const found = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='letters'").first();
+      if (!found) await db.exec(SCHEMA_SQL);
+    })();
+    schemaInitialization.set(db, initializing);
+    initializing.catch(() => schemaInitialization.delete(db));
+  }
+  await initializing;
+}
 const SECURITY_HEADERS = {"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
 const encode = (s)=>new TextEncoder().encode(s);
 const bytesToHex = (buf)=>Array.from(new Uint8Array(buf), b=>b.toString(16).padStart(2,"0")).join("");
@@ -218,6 +234,7 @@ export default {
     if(!dbReady(env))return error("D1 또는 R2 바인딩이 설정되지 않았어요.",503);
     if(!allowedOrigin(req)&&method!=="GET")return error("허용되지 않은 요청 출처예요.",403);
     try{
+      await ensureSchema(env.DB);
       if(path==="/api/health"&&method==="GET")return json({ok:true,service:"MyLetter"});
       if(path==="/api/letters"&&method==="POST")return await createLetter(req,env);
       const status=path.match(/^\/api\/letters\/([a-f0-9]{24})\/status$/);

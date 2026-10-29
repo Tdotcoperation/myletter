@@ -7,11 +7,12 @@ import worker from "../src/worker.js";
 class FakeDB {
   constructor(){
     this.letters=new Map();this.assets=new Map();this.stickers=new Map();
-    this.replies=new Map();this.sessions=new Map();this.attempts=new Map();
+    this.replies=new Map();this.sessions=new Map();this.attempts=new Map();this.schemaReady=false;this.schemaInitCount=0;
   }
   prepare(sql){
     let args=[];
     const first=async()=>{
+      if(sql.startsWith("SELECT name FROM sqlite_master"))return this.schemaReady?{name:"letters"}:null;
       if(sql.startsWith("SELECT * FROM letters"))return this.letters.get(args[0])??null;
       if(sql.startsWith("SELECT 1 AS ok FROM access_sessions")) {
         const v=this.sessions.get(args[0]);return v?.letter_id===args[1]&&v?.expires_at>args[2]?{ok:1}:null;
@@ -68,6 +69,7 @@ class FakeDB {
     };
     return {bind(...v){args=v;return this;},first,all,run};
   }
+  async exec(sql){assert.match(sql,/CREATE TABLE IF NOT EXISTS letters/);assert.match(sql,/CREATE TABLE IF NOT EXISTS replies/);this.schemaReady=true;this.schemaInitCount++;return {count:1};}
   async batch(stmts){return Promise.all(stmts.reduce((p,s)=>[...p,s],[]).map(s=>s.run()));}
 }
 class FakeR2{
@@ -153,4 +155,14 @@ test("future-dated letter is locked by the server",async()=>{
  assert.equal(r.status,425);
  r=await req(env,"/api/letters/"+id+"/unlock","POST",JSON.stringify({password:"any"}),{"Content-Type":"application/json"});
  assert.equal(r.status,425);
+});
+
+test("fresh D1 database initializes schema only once per Worker instance",async()=>{
+ const env=makeEnv();
+ let r=await req(env,"/api/health");
+ assert.equal(r.status,200);
+ assert.equal(env.DB.schemaInitCount,1);
+ r=await req(env,"/api/health");
+ assert.equal(r.status,200);
+ assert.equal(env.DB.schemaInitCount,1);
 });
