@@ -112,25 +112,50 @@ hr{border:0;border-top:1px solid #e9ded4;margin:25px 0}
 .arrival-caption{padding:21px 30px;border-radius:23px;background:rgba(29,28,27,.73);border:1px solid rgba(255,255,255,.27);color:white;box-shadow:0 12px 36px #0002;backdrop-filter:blur(17px);-webkit-backdrop-filter:blur(17px);text-align:center;max-width:min(92vw,600px)}
 .arrival-caption h1{font-size:clamp(21px,4.5vw,31px);letter-spacing:-.6px;margin:0 0 8px;line-height:1.5}
 .arrival-caption p{color:#f4ece7;font-size:14px;margin:0}
-.envelope-button{border:none;background:transparent;padding:20px;cursor:pointer;filter:drop-shadow(0 14px 18px #0002);transition:transform .3s;perspective:1200px}
-.envelope-button:hover{transform:translateY(-7px)}
-.envelope{position:relative;width:min(380px,77vw);height:245px;max-height:52vw;transform-style:preserve-3d}
-.env-back{position:absolute;inset:0;background:#e8d7bb;border-radius:6px;box-shadow:0 1px 2px #0002}
-.env-flap{position:absolute;inset:0;background:#f4e4c9;clip-path:polygon(0 0,100% 0,50% 59%);transform-origin:center top;backface-visibility:visible;z-index:6;filter:drop-shadow(0 4px 4px #0002)}
-.env-pocket{position:absolute;inset:0;background:linear-gradient(145deg,#f8ebd5,#d9c4a2);clip-path:polygon(0 0,50% 56%,100% 0,100% 100%,0 100%);z-index:3;border-radius:6px}
-.env-front{position:absolute;inset:0;background:linear-gradient(0deg,#ecdbc0,#f5e5cb);clip-path:polygon(0 100%,50% 43%,100% 100%);z-index:4}
-.env-fold{position:absolute;left:12%;top:26%;width:76%;height:66%;border-radius:3px;background:linear-gradient(#fffaf0 50%,#eaddc8 51%,#fff7e7 53%);box-shadow:0 3px 12px #0002;z-index:2}
+
+/* The envelope has real front/back layers. No seal or heart decoration. */
+.mail-scene{position:relative;flex:none;width:min(380px,77vw);height:245px;perspective:1300px;isolation:isolate}
+.envelope-button{position:absolute;inset:0;z-index:2;width:100%;height:100%;border:0;background:none;padding:0;cursor:pointer;filter:drop-shadow(0 12px 15px #0003);transition:filter .25s}
+.envelope-button:hover:not(:disabled){filter:drop-shadow(0 18px 17px #0004)}
+.envelope-button:focus-visible{outline:3px solid #d4b295;outline-offset:10px;border-radius:9px}
+.envelope{position:relative;width:100%;height:100%;overflow:visible;transform-style:preserve-3d}
+.env-back{position:absolute;inset:0;background:#dec8a6;border-radius:5px;z-index:0}
+.env-letter{position:absolute;left:12%;top:24%;width:76%;height:47%;border-radius:2px;z-index:2;background:linear-gradient(#fffaf1 0%,#fffaf1 48%,#eddfc8 49.3%,#fff7eb 51%,#fff7eb 100%);box-shadow:0 2px 7px #9a835f30}
+.env-letter::after{content:"";position:absolute;inset:0;border:1px solid #e9d7bb50}
+.env-pocket{position:absolute;inset:0;z-index:4;background:linear-gradient(155deg,#f7e8cf,#e5d1b1);clip-path:polygon(0 0,50% 45%,100% 0,100% 100%,0 100%);border-radius:4px}
+.env-front{position:absolute;inset:0;z-index:5;background:linear-gradient(180deg,#f3e3ca,#e9d4b1);clip-path:polygon(0 100%,50% 45%,100% 100%);border-radius:4px}
+.env-flap{position:absolute;inset:0;z-index:6;background:linear-gradient(150deg,#faebd2,#eddbc0);clip-path:polygon(0 0,100% 0,50% 71%);transform-origin:50% 0%;backface-visibility:visible;filter:drop-shadow(0 2px 1px #a9937929)}
+/* A duplicate of the extracted folded page sits ABOVE the envelope.
+   It is invisible until the original page has entirely cleared the pocket. */
+.free-letter{position:absolute;top:-50%;left:50%;width:76%;height:47%;z-index:8;opacity:0;pointer-events:none;transform:translateX(-50%);transform-style:preserve-3d;filter:drop-shadow(0 7px 7px #0002)}
+.free-letter-top{position:absolute;inset:0;border:1px solid #ebdac1;background:repeating-linear-gradient(0deg,#fff8e8 0px,#fff8e8 36px,#f8ecd9 37px,#fff8e8 38px);border-radius:2px 2px 0 0;box-shadow:inset 0 -1px 3px #9c866c24}
+.free-letter-bottom{position:absolute;top:100%;left:0;width:100%;height:100%;border:1px solid #ebdac1;background:repeating-linear-gradient(0deg,#fff8e8 0px,#fff8e8 36px,#f8ecd9 37px,#fff8e8 38px);transform-origin:50% 0;transform:rotateX(-179deg);backface-visibility:visible;box-shadow:0 8px 9px #0001}
+.free-letter-top::after{content:"";position:absolute;bottom:0;left:0;width:100%;height:3px;background:linear-gradient(180deg,#b8a38942,#fff9ed60)}
+.arrival-hint{font-size:11px;letter-spacing:2px;color:#766458;font-weight:800;text-align:center;margin:0}
 .arrival.opening .arrival-caption{animation:fade-caption .5s ease forwards}
-.arrival.opening .envelope-button{pointer-events:none;animation:envelope-begin .7s .5s ease-in-out both,envelope-vanish .4s 3s ease forwards}
-.arrival.opening .env-flap{animation:flap-open .8s 1.2s ease-in-out forwards}
-.arrival.opening .env-fold{animation:fold-up 1s 2s ease-in-out forwards}
-@keyframes fade-caption{to{opacity:0;transform:translateY(-16px)}}
-@keyframes envelope-begin{to{transform:scale(1.08) translateY(-24px)}}
-@keyframes flap-open{to{transform:rotateX(175deg);z-index:1}}
-@keyframes fold-up{to{transform:translateY(-110%)}}
-@keyframes envelope-vanish{to{opacity:0;transform:scale(.94)}}
-.reading{width:100%;max-width:790px;margin:4vh auto;position:relative;animation:unfold-paper 1.2s cubic-bezier(.18,.79,.2,1) both}
-@keyframes unfold-paper{0%{opacity:.4;transform:perspective(1100px) rotateX(-82deg) scaleY(.45)}45%{opacity:1}100%{opacity:1;transform:perspective(1100px) rotateX(0) scaleY(1)}}
+.arrival.opening .arrival-hint{animation:fade-caption .5s ease forwards}
+.arrival.opening .mail-scene{animation:mail-center .68s .45s cubic-bezier(.2,.8,.2,1) both}
+.arrival.opening .envelope-button{pointer-events:none;animation:envelope-disappear .46s 3.28s ease forwards}
+.arrival.opening .env-flap{animation:flap-open 0.78s 1.15s ease-in-out forwards}
+.arrival.opening .env-letter{animation:extract-letter 1.13s 1.96s cubic-bezier(.28,.7,.3,1) forwards}
+.arrival.opening .free-letter{animation:sheet-handoff .14s 3.05s linear forwards}
+.arrival.opening .free-letter-bottom{animation:unfold-lower-half 1.1s 3.64s cubic-bezier(.17,.78,.2,1) forwards}
+@keyframes fade-caption{to{opacity:0;transform:translateY(-15px)}}
+@keyframes mail-center{from{transform:translateY(0) scale(1)}to{transform:translateY(-36px) scale(1.06)}}
+@keyframes flap-open{0%{transform:rotateX(0);z-index:6}49%{z-index:6}50%{z-index:1}100%{transform:rotateX(-180deg);z-index:1}}
+@keyframes extract-letter{from{transform:translateY(0)}to{transform:translateY(-157%)}}
+@keyframes sheet-handoff{from{opacity:0}to{opacity:1}}
+@keyframes envelope-disappear{to{opacity:0;visibility:hidden;transform:translateY(28px) scale(.96)}}
+@keyframes unfold-lower-half{0%{transform:rotateX(-179deg)}45%{transform:rotateX(-95deg)}100%{transform:rotateX(0deg)}}
+/* The reading sheet appears flat. Never flip the full letter like a card. */
+.reading{width:100%;max-width:790px;margin:4vh auto;position:relative;animation:reading-fade-in .5s ease both}
+@keyframes reading-fade-in{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+.reading .paper::after{content:"";position:absolute;z-index:3;left:5%;right:5%;top:50%;height:2px;background:linear-gradient(180deg,#b39c7550,#fff9ec84);pointer-events:none;animation:fold-crease-fade 1.1s ease forwards}
+@keyframes fold-crease-fade{from{opacity:.9}to{opacity:0}}
+.reading .paper-content{pointer-events:auto}
+.reply-button-wrap,.reply-button-wrap #addReply{pointer-events:auto}
+.reply-button-wrap{z-index:4}
+.reply-button-wrap #addReply{position:relative;z-index:5;min-height:44px;cursor:pointer;touch-action:manipulation}
 .reading .paper{min-height:560px;padding:clamp(34px,8%,77px);box-shadow:0 25px 80px #0004}
 .reading .letter-body{font-size:clamp(16px,2vw,19px);min-height:150px}
 .reading .letter-sign{margin-bottom:45px}
@@ -168,9 +193,9 @@ hr{border:0;border-top:1px solid #e9ded4;margin:25px 0}
  .reading{margin:0 auto;width:100%}.reading .paper{padding:36px 25px;min-height:520px}.reading .letter-body{font-size:16px}
  .viewer{padding:20px 14px;background-attachment:scroll}
  .arrival{gap:20px}.arrival-caption{padding:18px 20px;border-radius:18px}.arrival-caption h1{font-size:21px}
- .envelope{height:195px}.postit{width:150px;min-height:110px;font-size:15px}
+ .mail-scene{height:min(53vw,215px)}.postit{width:150px;min-height:110px;font-size:15px}
  .success-card{margin:35px 0 0}.success-card h1{font-size:28px}.success-buttons{flex-direction:column}
 }
-@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.arrival.opening .envelope-button{opacity:0}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.arrival.opening .envelope-button{opacity:0}.arrival.opening .free-letter{opacity:1}.arrival.opening .free-letter-bottom{transform:rotateX(0deg)}}
 
 .preview-side .decal{pointer-events:none}

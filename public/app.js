@@ -246,17 +246,30 @@ async function fetchRecipientLetter(){
  catch(err){showError(err.message);}
 }
 function envelopeHTML(){
- return '<div class="envelope" aria-hidden="true"><div class="env-back"></div><div class="env-fold"></div><div class="env-pocket"></div><div class="env-front"></div><div class="env-flap"></div></div>';
+ // The small folded page is physically BEHIND the solid envelope pocket.
+ // A separate sheet takes over above the pocket only when extraction finishes.
+ return '<div class="mail-scene"><button type="button" class="envelope-button" id="openEnvelope" aria-label="편지봉투 열기"><div class="envelope" aria-hidden="true"><div class="env-back"></div><div class="env-letter"></div><div class="env-pocket"></div><div class="env-front"></div><div class="env-flap"></div></div></button><div class="free-letter" aria-hidden="true"><div class="free-letter-top"></div><div class="free-letter-bottom"></div></div></div>';
 }
 function renderArrival(){
  const name=safe(currentLetter.sender);
- app.innerHTML='<main class="viewer"><div class="arrival" id="arrival"><div class="arrival-caption"><h1>'+name+particle(currentLetter.sender)+' 편지를 보냈어요.</h1><p>아래 편지를 눌러 열어보세요.</p></div><button class="envelope-button" id="openEnvelope" aria-label="편지봉투 열기">'+envelopeHTML()+'</button><p style="font-size:11px;letter-spacing:2px;color:#766458;font-weight:800">A LETTER FOR YOU</p></div></main>';
+ app.innerHTML='<main class="viewer"><div class="arrival" id="arrival"><div class="arrival-caption"><h1>'+name+particle(currentLetter.sender)+' 편지를 보냈어요.</h1><p>아래 편지를 눌러 열어보세요.</p></div>'+envelopeHTML()+'<p class="arrival-hint">A LETTER FOR YOU</p></div></main>';
  setViewerBg();
  $("#openEnvelope").addEventListener("click",()=>{
-   if($("#arrival").classList.contains("opening"))return;
-   $("#arrival").classList.add("opening");
+   const arrival=$("#arrival");
+   if(!arrival||arrival.classList.contains("opening"))return;
+   arrival.classList.add("opening");
+   $("#openEnvelope").disabled=true;
    const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-   setTimeout(()=>{const viewer=$(".viewer");if(!viewer)return;viewer.innerHTML=renderReadingHTML();attachReading();window.scrollTo(0,0);},reduced?100:3380);
+   // Fade the caption, center/open the envelope, extract a folded sheet
+   // BEHIND its pocket, let the envelope disappear, and unfold the bottom half.
+   // Only then fade into the full, readable paper (without rotating the card).
+   setTimeout(()=>{
+     const viewer=$(".viewer");
+     if(!viewer||!viewer.contains(arrival))return;
+     viewer.innerHTML=renderReadingHTML();
+     attachReading();
+     window.scrollTo({top:0,behavior:"instant"});
+   },reduced?80:5000);
  });
 }
 function replyHTML(r){
