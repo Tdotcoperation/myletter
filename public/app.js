@@ -14,6 +14,7 @@ function restore(){
 }
 let draft=restore(),step=1,bgFile=null,bgPreview="",stickers=[],chosenSticker=null;
 let receipt=null,currentLetter=null,currentLetterId="",issuing=false,toastTimeout=null;
+let manageContext=null,managementSaving=false;
 const safe=(s)=>String(s??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 const lines=s=>safe(s).replace(/\r?\n/g,"<br>");
 const cssFont=id=>["pretendard","wanted","seoyun","hippie"].includes(id)?id:"pretendard";
@@ -128,9 +129,15 @@ function addStickerFiles(files){
  if(changed)renderDecorator();
 }
 function renderDecorator(){
- app.innerHTML='<div class="decor-shell">'+brand()+'<div class="decor-bar"><div><div class="smallcaps">DECORATE YOUR LETTER</div><h1 style="margin:9px 0 2px">내 편지 꾸미기</h1></div><div class="decor-controls"><label class="btn btn-small">＋ 스티커 업로드 <input type="file" id="stickerFiles" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden></label><button class="btn btn-small btn-ghost" id="deleteSticker">선택 삭제</button><button class="btn btn-primary btn-small" id="saveDecoration">완료 ✓</button></div></div><p class="decor-help">이미지를 드래그 앤 드롭으로 편지지에 올리거나 업로드해 보세요. 스티커를 누른 채로 움직이고, PC에서는 선택 후 D 키로 삭제할 수 있어요. 모바일에서는 선택 삭제 버튼을 사용해요.</p><div class="decor-stage"><div class="paper-frame">'+paperHTML(draft,true)+'</div></div><p class="footer-note">완료를 누르면 배치한 스티커의 위치가 발급할 편지에 적용돼요.</p></div>';
+ const managing=Boolean(manageContext);
+ const editingLetter=managing?{...manageContext.letter,allowReply:false,replies:[]}:draft;
+ app.innerHTML='<div class="decor-shell">'+brand()+'<div class="decor-bar"><div><div class="smallcaps">DECORATE YOUR LETTER</div><h1 style="margin:9px 0 2px">'+(managing?'발급된 편지 스티커 수정':'내 편지 꾸미기')+'</h1></div><div class="decor-controls"><label class="btn btn-small">＋ 스티커 업로드 <input type="file" id="stickerFiles" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden></label><button class="btn btn-small btn-ghost" id="deleteSticker">선택 삭제</button><button class="btn btn-primary btn-small" id="saveDecoration">'+(managing?'변경사항 저장':'완료 ✓')+'</button></div></div><p class="decor-help">'+(managing?'보내는 사람·받는 사람·제목·본문은 발급 당시 내용으로 고정됩니다. 스티커는 추가·이동·삭제만 할 수 있어요. <strong>변경사항 저장</strong>을 눌러야 친구에게 반영됩니다.':'이미지를 드래그 앤 드롭으로 편지지에 올리거나 업로드해 보세요. 스티커를 누른 채로 움직이고, PC에서는 선택 후 D 키로 삭제할 수 있어요. 모바일에서는 선택 삭제 버튼을 사용해요.')+'</p><div class="decor-stage"><div class="paper-frame">'+paperHTML(editingLetter,true)+'</div></div>'+(managing?'<div class="manage-footer"><div><strong>관리 링크 전용</strong><p class="hint">편지 내용과 이미지는 공개되지 않도록 비밀 관리 링크를 보관하세요.</p></div><div class="decor-controls"><a class="btn btn-small btn-ghost" href="/l/'+manageContext.id+'">받는 사람 화면</a><button class="btn btn-danger btn-small" id="deleteLetter">편지 영구 삭제</button></div></div>':'<p class="footer-note">완료를 누르면 배치한 스티커의 위치가 발급할 편지에 적용돼요.</p>')+'</div>';
  $("#stickerFiles").addEventListener("change",e=>{addStickerFiles(e.target.files);e.target.value="";});
- $("#saveDecoration").addEventListener("click",()=>{chosenSticker=null;renderOptions();});
+ $("#saveDecoration").addEventListener("click",()=>{
+   if(managing)saveManagedStickers();
+   else{chosenSticker=null;renderOptions();}
+ });
+ if(managing)$("#deleteLetter").addEventListener("click",()=>deleteManagedLetter(manageContext.id,manageContext.token));
  $("#deleteSticker").addEventListener("click",deleteChosenSticker);
  const paper=$("#letterPaper");
  paper.addEventListener("dragover",e=>{e.preventDefault();paper.classList.add("drag-target");});
@@ -332,14 +339,67 @@ function openReplyModal(){
    }catch(err){toast(err.message);btn.disabled=false;btn.textContent="작성 완료";}
  });
 }
+
+function manageHeaders(token){return {Authorization:"Bearer "+token};}
+async function loadManageImage(url,token){
+ const r=await fetch(url,{cache:"no-store",headers:manageHeaders(token)});
+ if(!r.ok)throw Error("이미지를 가져올 수 없어요. (HTTP "+r.status+")");
+ return URL.createObjectURL(await r.blob());
+}
 async function renderManage(id,token){
- app.innerHTML='<div class="shell">'+brand()+'<div class="panel success-card"><div class="final-icon">⚙</div><h1>편지 관리</h1><p class="muted">이 링크를 가진 사람은 편지를 삭제할 수 있어요. 외부에 공개하지 마세요.</p><button class="btn btn-danger" id="deleteLetter">편지 영구 삭제</button><p class="hint">삭제된 편지와 업로드 이미지는 복구할 수 없어요.</p></div></div>';
- $("#deleteLetter").addEventListener("click",async()=>{
-   if(!confirm("정말 이 편지를 삭제할까요?"))return;
-   if(!confirm("모든 메모지와 이미지도 삭제됩니다. 계속할까요?"))return;
-   try{await api("/api/letters/"+id,{method:"DELETE",headers:{"Authorization":"Bearer "+token}});toast("편지를 삭제했어요.");location.replace("/");}
-   catch(err){toast(err.message);}
- });
+ app.innerHTML='<div class="loading-screen"><span class="logo-mark">✉</span><p>편지의 스티커를 불러오는 중이에요…</p></div>';
+ try{
+   const letter=await api("/api/manage/"+id,{headers:manageHeaders(token)});
+   const loaded=[];
+   try{
+     for(const item of letter.stickers){
+       loaded.push({...item,preview:await loadManageImage(item.url,token)});
+     }
+   }catch(e){
+     for(const st of loaded)URL.revokeObjectURL(st.preview);
+     throw e;
+   }
+   // Preserve the original content without offering any content-editing input.
+   // Only sticker images, positions, and additions/removals are editable.
+   if(manageContext){
+     for(const st of stickers)if(st.preview?.startsWith("blob:"))URL.revokeObjectURL(st.preview);
+   }
+   manageContext={id,token,letter};
+   stickers=loaded;
+   chosenSticker=null;
+   renderDecorator();
+ }catch(err){showError("관리 페이지를 열 수 없어요. "+err.message);}
+}
+async function saveManagedStickers(){
+ if(!manageContext||managementSaving)return;
+ const button=$("#saveDecoration");
+ managementSaving=true;
+ button.disabled=true;
+ button.textContent="저장 중…";
+ const form=new FormData();
+ const items=stickers.map(st=>({id:st.id,asset_id:st.asset_id,x:st.x,y:st.y,w:st.w}));
+ form.append("data",JSON.stringify({stickers:items}));
+ for(const st of stickers)if(st.file)form.append("sticker_"+st.id,st.file,st.file.name);
+ try{
+   await api("/api/manage/"+manageContext.id+"/stickers",{
+     method:"PUT",headers:manageHeaders(manageContext.token),body:form
+   });
+   const {id,token}=manageContext;
+   await renderManage(id,token);
+   toast("스티커 변경사항을 서버에 저장했어요.");
+ }catch(err){
+   toast("저장 실패: "+err.message);
+   button.disabled=false;
+   button.textContent="변경사항 저장";
+ }finally{managementSaving=false;}
+}
+async function deleteManagedLetter(id,token){
+ if(!confirm("정말 이 편지를 삭제할까요?"))return;
+ if(!confirm("모든 스티커, 메모지, 이미지까지 삭제됩니다. 계속할까요?"))return;
+ try{
+   await api("/api/letters/"+id,{method:"DELETE",headers:manageHeaders(token)});
+   toast("편지를 삭제했어요.");location.replace("/");
+ }catch(err){toast(err.message);}
 }
 function boot(){
  const path=location.pathname;
