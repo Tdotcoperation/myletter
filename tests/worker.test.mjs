@@ -36,6 +36,10 @@ class FakeDB {
       throw new Error("Unmocked all: "+sql);
     };
     const run=async()=>{
+      if(sql.startsWith("CREATE TABLE IF NOT EXISTS ") || sql.startsWith("CREATE INDEX IF NOT EXISTS ")){
+        if(sql.startsWith("CREATE TABLE IF NOT EXISTS login_attempts")){this.schemaReady=true;this.schemaInitCount++;}
+        return {};
+      }
       if(sql.startsWith("INSERT INTO letters")){
         const [id,sender,recipient,title,body,font,paper,bg_asset,password_salt,password_hash,available_at,allow_reply,manage_hash]=args;
         this.letters.set(id,{id,sender,recipient,title,body,font,paper,bg_asset,password_salt,password_hash,available_at,allow_reply,manage_hash,views:0});return {};
