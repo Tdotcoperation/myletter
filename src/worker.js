@@ -12,8 +12,15 @@ async function ensureSchema(db) {
   let initializing = schemaInitialization.get(db);
   if (!initializing) {
     initializing = (async () => {
-      const found = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='letters'").first();
-      if (!found) await db.exec(SCHEMA_SQL);
+      // D1Database.exec() splits SQL on line boundaries and can reject multiline
+      // CREATE TABLE definitions. Execute each complete statement separately.
+      const complete = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='login_attempts'").first();
+      if (!complete) {
+        const statements = SCHEMA_SQL.split(/;\s*(?:\r?\n|$)/).map(x => x.trim()).filter(Boolean);
+        for (const statement of statements) {
+          await db.prepare(statement).run();
+        }
+      }
     })();
     schemaInitialization.set(db, initializing);
     initializing.catch(() => schemaInitialization.delete(db));
