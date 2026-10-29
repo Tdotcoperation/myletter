@@ -246,8 +246,8 @@ async function fetchRecipientLetter(){
  catch(err){showError(err.message);}
 }
 function envelopeHTML(){
- // The small folded page is physically BEHIND the solid envelope pocket.
- // A separate sheet takes over above the pocket only when extraction finishes.
+ // The 4:3 folded page stays BEHIND the opaque envelope pocket while being extracted.
+ // Once clear, the envelope disappears and the two paper halves unfold to 3:4.
  return '<div class="mail-scene"><button type="button" class="envelope-button" id="openEnvelope" aria-label="편지봉투 열기"><div class="envelope" aria-hidden="true"><div class="env-back"></div><div class="env-letter"></div><div class="env-pocket"></div><div class="env-front"></div><div class="env-flap"></div></div></button><div class="free-letter" aria-hidden="true"><div class="free-letter-top"></div><div class="free-letter-bottom"></div></div></div>';
 }
 function renderArrival(){
@@ -258,18 +258,34 @@ function renderArrival(){
    const arrival=$("#arrival");
    if(!arrival||arrival.classList.contains("opening"))return;
    arrival.classList.add("opening");
-   $("#openEnvelope").disabled=true;
+   // Do not disable the button: the global button:disabled rule sets opacity to .5.
+   // The .opening guard and CSS pointer-events prevent repeated clicks without fading the envelope.
    const reduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-   // Fade the caption, center/open the envelope, extract a folded sheet
-   // BEHIND its pocket, let the envelope disappear, and unfold the bottom half.
-   // Only then fade into the full, readable paper (without rotating the card).
+   // Preserve a solid envelope, extract the opaque 4:3 folded sheet,
+   // remove the envelope, unfold into 3:4, THEN enlarge the full paper.
+   // Text, stickers and post-its fade in only after the paper expansion.
    setTimeout(()=>{
      const viewer=$(".viewer");
      if(!viewer||!viewer.contains(arrival))return;
      viewer.innerHTML=renderReadingHTML();
      attachReading();
      window.scrollTo({top:0,behavior:"instant"});
-   },reduced?80:5000);
+     const reading=$(".reading",viewer);
+     if(!reading)return;
+     let revealed=false;
+     const reveal=()=>{
+       if(revealed||!reading.isConnected)return;
+       revealed=true;
+       reading.classList.add("content-visible");
+     };
+     if(reduced)requestAnimationFrame(reveal);
+     else {
+       reading.addEventListener("animationend",event=>{
+         if(event.target===reading&&event.animationName==="reading-grow")reveal();
+       });
+       setTimeout(reveal,1300); // fallback if animation events are suppressed
+     }
+   },reduced?80:4940);
  });
 }
 function replyHTML(r){
