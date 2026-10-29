@@ -42,7 +42,7 @@ function paperHTML(d,decor=false){
  return '<article class="'+className+'" id="letterPaper"><div class="paper-content"><p class="letter-head">To. '+safe(d.recipient||"소중한 친구")+'</p><h2 class="letter-title">'+safe(d.title||"전하고 싶은 이야기")+'</h2><div class="letter-body">'+safe(d.body||"여기에 마음을 담아 편지를 써 보세요.")+'</div><p class="letter-sign">From. '+safe(d.sender||"보내는 사람")+'</p>'+replyButton+'</div>'+overlays+replies+'</article>';
 }
 function sidePreview(){
- return '<aside class="preview-side"><div class="preview-label"><span>✦ 실시간 편지 미리보기</span><span>MY LETTER</span></div><div class="paper-frame">'+paperHTML(draft)+'</div><p class="footer-note">화면에 따라 편지지 크기는 자동으로 조절돼요.</p></aside>';
+ return '<aside class="preview-side"><div class="preview-label"><span>✦ 실시간 편지 미리보기</span><span>MY LETTER</span></div><div class="paper-frame">'+paperHTML(draft,true)+'</div><p class="footer-note">화면에 따라 편지지 크기는 자동으로 조절돼요.</p></aside>';
 }
 function wizardFrame(body,subtitle){
  return '<div class="shell">'+brand()+'<section class="hero"><span class="eyebrow">A LETTER FROM THE HEART</span><h1>마음을 담아, 편지를 써 보세요.</h1><p>글씨 하나, 작은 장식 하나까지 직접 골라 전하는 나만의 편지.</p></section><div class="wizard"><section class="panel"><div class="progress">'+[1,2,3,4].map(n=>'<span class="'+(n<=step?"active":"")+'"></span>').join("")+'</div><div class="smallcaps">STEP '+String(step).padStart(2,"0")+' / 04</div><h2 style="margin-top:10px">'+["","편지 작성하기","편지 스타일 고르기","편지 옵션과 꾸미기","마지막으로, 이름을 알려주세요"][step]+'</h2><p class="muted">'+subtitle+'</p>'+body+'</section>'+sidePreview()+'</div></div>';
@@ -89,7 +89,7 @@ function renderOptions(){
 function renderFinal(){
  const body='<div class="final-banner"><div class="final-icon">✉</div><p class="muted">이제 거의 다 왔어요. 마지막으로 이름을 남겨 주세요.</p></div>'+
  '<div class="field"><label for="sender">보내는 사람 이름 또는 닉네임</label><input id="sender" maxlength="60" placeholder="예: 승우, 익명의 친구" value="'+safe(draft.sender)+'"><p class="hint">이 이름은 첫 화면과 편지 하단에 표시돼요.</p></div>'+
- '<div class="option-card"><div class="smallcaps">PREVIEW</div><p style="margin:12px 0 5px;text-align:center" id="senderPreview">'+safe(draft.sender||"보내는 사람")+'이(가) 편지를 보냈어요.</p><p class="muted" style="text-align:center;margin:0">발급한 편지는 고유 링크로 공유할 수 있어요.</p></div>'+
+ '<div class="option-card"><div class="smallcaps">PREVIEW</div><p style="margin:12px 0 5px;text-align:center" id="senderPreview">'+safe(draft.sender||"보내는 사람")+particle(draft.sender||"보내는 사람")+' 편지를 보냈어요.</p><p class="muted" style="text-align:center;margin:0">발급한 편지는 고유 링크로 공유할 수 있어요.</p></div>'+
  '<div class="actions"><button class="btn btn-ghost" id="prevStep">← 이전</button><button class="btn btn-primary" id="issueLetter">✉ 발급하기</button></div>';
  app.innerHTML=wizardFrame(body,"발급하기를 누르면 편지 내용과 이미지가 서버에 저장되고 공유 링크가 만들어져요.");
  $("#sender").addEventListener("input",e=>{draft.sender=e.target.value;store();$("#senderPreview").textContent=draft.sender?draft.sender+particle(draft.sender)+" 편지를 보냈어요.":"보내는 사람이 편지를 보냈어요.";$(".preview-side .paper-frame").innerHTML=paperHTML(draft);});
@@ -163,7 +163,7 @@ function attachDrag(el,obj,paper,isReply){
      if(ev.pointerId!==e.pointerId)return;
      const dx=(ev.clientX-startX)/rect.width,dy=(ev.clientY-startY)/rect.height;
      if(Math.abs(dx)+Math.abs(dy)>.005)moved=true;
-     obj.x=Math.max(-.25,Math.min(1.2,originalX+dx));obj.y=Math.max(-.25,Math.min(1.2,originalY+dy));
+     const minX=-Math.min(.12,el.offsetWidth/rect.width*.25),maxX=Math.max(0,1-el.offsetWidth/rect.width+.09);obj.x=Math.max(minX,Math.min(maxX,originalX+dx));obj.y=Math.max(-.15,Math.min(1.02,originalY+dy));
      el.style.left=(obj.x*100)+"%";el.style.top=(obj.y*100)+"%";
    };
    const end=async ev=>{
@@ -263,7 +263,7 @@ function replyHTML(r){
  const x=Number(r.x),y=Number(r.y);
  const c=["yellow","pink","mint","blue"].includes(r.color)?r.color:"yellow";
  const own=Boolean(ownedReplyToken(r.id));
- return '<div class="postit '+(own?"":"readonly")+'" tabindex="'+(own?"0":"-1")+'" role="note" data-reply="'+safe(r.id)+'" data-color="'+c+'" style="left:'+(Math.max(-.3,Math.min(1.3,x))*100)+'%;top:'+(Math.max(-.3,Math.min(1.3,y))*100)+'%"><span>'+safe(r.body)+'</span></div>';
+ return '<div class="postit '+(own?"":"readonly")+'" tabindex="'+(own?"0":"-1")+'" role="note" data-reply="'+safe(r.id)+'" data-color="'+c+'" style="left:'+(Math.max(-.15,Math.min(.97,x))*100)+'%;top:'+(Math.max(-.3,Math.min(1.3,y))*100)+'%"><span>'+safe(r.body)+'</span></div>';
 }
 function storedTokens(){
  try{return JSON.parse(localStorage.getItem("myletter.reply.tokens")||"{}");}catch{return {};}

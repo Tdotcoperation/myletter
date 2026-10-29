@@ -97,7 +97,7 @@ async function createLetter(req,env){
   const keys=[], assetEntries=[], stickerEntries=[];
   async function store(file,assetId){
     const key="letters/"+id+"/"+assetId;
-    await env.BUCKET.put(key,file.stream(),{httpMetadata:{contentType:file.type}});
+    await env.BUCKET.put(key,file,{httpMetadata:{contentType:file.type}});
     keys.push(key);
     assetEntries.push({id:assetId,key,mime:file.type,bytes:file.size});
     return assetId;

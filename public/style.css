@@ -172,3 +172,5 @@ hr{border:0;border-top:1px solid #e9ded4;margin:25px 0}
  .success-card{margin:35px 0 0}.success-card h1{font-size:28px}.success-buttons{flex-direction:column}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.arrival.opening .envelope-button{opacity:0}}
+
+.preview-side .decal{pointer-events:none}

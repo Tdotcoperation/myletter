@@ -1,4 +1,3 @@
-PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS letters (
   id TEXT PRIMARY KEY,
   sender TEXT NOT NULL,
