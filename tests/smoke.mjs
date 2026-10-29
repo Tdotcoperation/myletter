@@ -10,12 +10,13 @@ async function request(path,opts) {
 }
 const png=Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9buKd7sAAAAASUVORK5CYII=","base64"));
 function postLetter({upload=false,password=""}={}){
-  const data={sender:"테스트",recipient:"친구",title:"마음",body:"실제 D1/R2 연동 테스트",font:"pretendard",paper:"classic",allow_reply:true,password:password||null,stickers:upload?[{id:"test-sticker-001",x:0.1,y:0.2,w:0.2}]:[]};
+  const stickerId="test-sticker-"+crypto.randomUUID().slice(0,8);
+  const data={sender:"테스트",recipient:"친구",title:"마음",body:"실제 D1/R2 연동 테스트",font:"pretendard",paper:"classic",allow_reply:true,password:password||null,stickers:upload?[{id:stickerId,x:0.1,y:0.2,w:0.2}]:[]};
   const form=new FormData();
   form.set("data",JSON.stringify(data));
   if(upload){
     form.set("background",new File([png],"background.png",{type:"image/png"}));
-    form.set("sticker_test-sticker-001",new File([png],"sticker.png",{type:"image/png"}));
+    form.set("sticker_"+stickerId,new File([png],"sticker.png",{type:"image/png"}));
   }
   return request("/api/letters",{method:"POST",body:form});
 }
