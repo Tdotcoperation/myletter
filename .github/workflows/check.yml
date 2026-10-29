@@ -29,6 +29,10 @@ jobs:
   remote-health:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Probe live custom domain without modifying production data
         shell: bash
         run: |
