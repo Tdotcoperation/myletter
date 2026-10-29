@@ -13,6 +13,8 @@ jobs:
           node-version: '22'
       - run: npm install
       - run: npm run check
+      - name: Install Chromium for real UI interaction tests
+        run: npx playwright install --with-deps chromium
       - name: Smoke-test real Wrangler D1 and R2 runtime
         shell: bash
         run: |
@@ -25,6 +27,7 @@ jobs:
             sleep 2
           done
           node tests/smoke.mjs
+          node tests/browser.mjs
 
   remote-health:
     runs-on: ubuntu-latest

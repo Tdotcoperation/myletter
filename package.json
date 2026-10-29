@@ -8,6 +8,7 @@
     "check": "node --check src/worker.js && node --check public/app.js && node --test tests/*.test.mjs"
   },
   "devDependencies": {
-    "wrangler": "^4.48.0"
+    "wrangler": "^4.48.0",
+    "playwright": "^1.57.0"
   }
 }
