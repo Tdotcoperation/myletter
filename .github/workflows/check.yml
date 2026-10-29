@@ -13,3 +13,15 @@ jobs:
           node-version: '22'
       - run: npm install
       - run: npm run check
+      - name: Smoke-test real Wrangler D1 and R2 runtime
+        shell: bash
+        run: |
+          set -e
+          npx wrangler dev --local --port 8787 --ip 127.0.0.1 > /tmp/myletter-wrangler.log 2>&1 &
+          echo $! > /tmp/myletter-wrangler.pid
+          trap 'cat /tmp/myletter-wrangler.log; kill $(cat /tmp/myletter-wrangler.pid) 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:8787/ > /dev/null; then break; fi
+            sleep 2
+          done
+          node tests/smoke.mjs
