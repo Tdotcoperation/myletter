@@ -121,14 +121,14 @@ hr{border:0;border-top:1px solid #e9ded4;margin:25px 0}
 .envelope-button:focus-visible{outline:3px solid #d4b295;outline-offset:10px;border-radius:9px}
 .envelope{position:relative;width:100%;height:100%;overflow:visible;transform-style:preserve-3d}
 .env-back{position:absolute;inset:0;background:#dec8a6;border-radius:5px;z-index:0}
-.env-letter{position:absolute;left:12%;top:20%;width:76%;height:auto;aspect-ratio:4 / 3;border-radius:2px;z-index:2;background:linear-gradient(#fffaf1 0%,#fffaf1 48%,#eddfc8 49.3%,#fff7eb 51%,#fff7eb 100%);box-shadow:0 2px 7px #9a835f30}
+.env-letter{position:absolute;left:14%;top:8%;width:72%;height:auto;aspect-ratio:4 / 3;border-radius:2px;z-index:2;background:linear-gradient(#fffaf1 0%,#fffaf1 48%,#eddfc8 49.3%,#fff7eb 51%,#fff7eb 100%);box-shadow:0 2px 7px #9a835f30}
 .env-letter::after{content:"";position:absolute;inset:0;border:1px solid #e9d7bb50}
 .env-pocket{position:absolute;inset:0;z-index:4;background:linear-gradient(155deg,#f7e8cf,#e5d1b1);clip-path:polygon(0 0,50% 45%,100% 0,100% 100%,0 100%);border-radius:4px}
 .env-front{position:absolute;inset:0;z-index:5;background:linear-gradient(180deg,#f3e3ca,#e9d4b1);clip-path:polygon(0 100%,50% 45%,100% 100%);border-radius:4px}
 .env-flap{position:absolute;inset:0;z-index:6;background:linear-gradient(150deg,#faebd2,#eddbc0);clip-path:polygon(0 0,100% 0,50% 71%);transform-origin:50% 0%;backface-visibility:visible;filter:drop-shadow(0 2px 1px #a9937929)}
 /* A duplicate of the extracted folded page sits ABOVE the envelope.
    It is invisible until the original page has entirely cleared the pocket. */
-.free-letter{position:absolute;top:-100%;left:50%;width:76%;height:auto;aspect-ratio:4 / 3;z-index:8;opacity:0;pointer-events:none;transform:translateX(-50%) scaleX(1);transform-style:preserve-3d;filter:drop-shadow(0 7px 7px #0002)}
+.free-letter{position:absolute;top:-100%;left:50%;width:72%;height:auto;aspect-ratio:4 / 3;z-index:8;opacity:0;pointer-events:none;transform:translateX(-50%) scaleX(1);transform-style:preserve-3d;filter:drop-shadow(0 7px 7px #0002)}
 .free-letter-top{position:absolute;inset:0;border:1px solid #ebdac1;background:repeating-linear-gradient(0deg,#fff8e8 0px,#fff8e8 36px,#f8ecd9 37px,#fff8e8 38px);border-radius:2px 2px 0 0;box-shadow:inset 0 -1px 3px #9c866c24}
 .free-letter-bottom{position:absolute;top:100%;left:0;width:100%;height:100%;border:1px solid #ebdac1;background:repeating-linear-gradient(0deg,#fff8e8 0px,#fff8e8 36px,#f8ecd9 37px,#fff8e8 38px);transform-origin:50% 0;transform:rotateX(-179deg);backface-visibility:visible;box-shadow:0 8px 9px #0001}
 .free-letter-top::after{content:"";position:absolute;bottom:0;left:0;width:100%;height:3px;background:linear-gradient(180deg,#b8a38942,#fff9ed60)}

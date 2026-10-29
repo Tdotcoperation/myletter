@@ -241,6 +241,107 @@ async function moveReply(req,env,id){
   await env.DB.prepare("UPDATE replies SET x=?,y=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(input.x,input.y,id).run();
   return json({ok:true});
 }
+
+function ownerBearer(req){
+  return (req.headers.get("Authorization")||"").replace(/^Bearer\s+/i,"");
+}
+async function ownerLetter(req,env,id){
+  const token=ownerBearer(req);
+  if(!(/^[a-f0-9]{64}$/.test(token)))return null;
+  const letter=await getLetter(env,id);
+  if(!letter||!equal(await digest(token),letter.manage_hash))return null;
+  return letter;
+}
+async function ownerRead(req,env,id){
+  const letter=await ownerLetter(req,env,id);
+  if(!letter)return error("유효하지 않은 관리 링크예요.",403);
+  const stickers=await env.DB.prepare("SELECT id,asset_id,x,y,w,z FROM stickers WHERE letter_id=? ORDER BY z ASC").bind(id).all();
+  return json({
+    id, sender:letter.sender,recipient:letter.recipient,title:letter.title,
+    body:letter.body,font:letter.font,paper:letter.paper,
+    background:letter.bg_asset?"/api/manage/"+id+"/media/"+letter.bg_asset:null,
+    allowReply:false,
+    stickers:stickers.results.map(s=>({...s,url:"/api/manage/"+id+"/media/"+s.asset_id}))
+  });
+}
+async function ownerMedia(req,env,id,assetId){
+  const letter=await ownerLetter(req,env,id);
+  if(!letter)return error("관리 권한이 없어요.",403);
+  const a=await env.DB.prepare("SELECT r2_key,mime FROM assets WHERE id=? AND letter_id=?").bind(assetId,id).first();
+  if(!a)return error("이미지를 찾을 수 없어요.",404);
+  const object=await env.BUCKET.get(a.r2_key);
+  if(!object)return error("이미지를 찾을 수 없어요.",404);
+  return new Response(object.body,{headers:{
+    "Content-Type":a.mime,"Cache-Control":"private,no-store",
+    "X-Content-Type-Options":"nosniff","Cross-Origin-Resource-Policy":"same-origin",
+    "Content-Security-Policy":"default-src 'none'; sandbox"
+  }});
+}
+async function ownerUpdateStickers(req,env,id){
+  const letter=await ownerLetter(req,env,id);
+  if(!letter)return error("관리 권한이 없어요.",403);
+  if(Number(req.headers.get("Content-Length")||0)>17*1024*1024)return error("업로드 용량이 너무 커요.",413);
+  const form=await req.formData();
+  let data;
+  try{data=JSON.parse(form.get("data"));}catch{return error("스티커 데이터가 올바르지 않아요.");}
+  if(!data||!Array.isArray(data.stickers)||data.stickers.length>20)return error("스티커는 최대 20개까지 등록할 수 있어요.");
+  const old=await env.DB.prepare("SELECT id,asset_id FROM stickers WHERE letter_id=?").bind(id).all();
+  const oldMap=new Map(old.results.map(s=>[s.id,s.asset_id]));
+  const knownIds=new Set(),newFiles=[],updated=[];
+  let totalSize=0;
+  for(const st of data.stickers){
+    if(!st||typeof st.id!=="string"||!(/^[a-zA-Z0-9_-]{6,80}$/.test(st.id))||
+      knownIds.has(st.id)||!limitedNum(st.x,-0.3,1.3)||!limitedNum(st.y,-0.3,1.3)||
+      !limitedNum(st.w,0.05,0.8))return error("스티커의 위치 또는 식별자가 올바르지 않아요.");
+    knownIds.add(st.id);
+    const previous=oldMap.get(st.id);
+    if(previous){
+      if(st.asset_id!==previous||form.has("sticker_"+st.id))return error("기존 스티커 파일은 교체할 수 없어요.",400);
+      updated.push({...st,assetId:previous});
+    }else{
+      const file=form.get("sticker_"+st.id);
+      if(!(file instanceof File))return error("새 스티커 이미지가 없어요.");
+      validateFile(file,2*1024*1024);
+      await sniff(file);
+      totalSize+=file.size;
+      newFiles.push({st,file});
+    }
+  }
+  if(totalSize>16*1024*1024)return error("이미지 전체 용량은 16MB 이하여야 해요.",413);
+  const uploads=[...form.entries()].filter(([,v])=>v instanceof File);
+  if(uploads.length!==newFiles.length)return error("허용되지 않은 첨부 파일이 있어요.");
+  const newAssets=[],uploadedKeys=[];
+  try{
+    for(const {st,file} of newFiles){
+      const assetId=rand(12),key="letters/"+id+"/"+assetId;
+      await env.BUCKET.put(key,file,{httpMetadata:{contentType:file.type}});
+      uploadedKeys.push(key);
+      newAssets.push({id:assetId,key,mime:file.type,bytes:file.size});
+      updated.push({...st,assetId});
+    }
+    const keep=new Set(updated.map(s=>s.id));
+    const removed=[...oldMap].filter(([sid])=>!keep.has(sid)).map(([,assetId])=>assetId);
+    const removedAssets=removed.length ? await env.DB.prepare("SELECT id,r2_key FROM assets WHERE letter_id=?").bind(id).all() : {results:[]};
+    const deleteKeys=removedAssets.results.filter(a=>removed.includes(a.id)).map(a=>a.r2_key);
+    const positions=new Map(updated.map(s=>[s.id,s]));
+    const stmts=[env.DB.prepare("DELETE FROM stickers WHERE letter_id=?").bind(id)];
+    for(const a of newAssets)stmts.push(env.DB.prepare("INSERT INTO assets(id,letter_id,r2_key,mime,bytes) VALUES (?,?,?,?,?)").bind(a.id,id,a.key,a.mime,a.bytes));
+    for(let i=0;i<data.stickers.length;i++){
+      const st=positions.get(data.stickers[i].id);
+      stmts.push(env.DB.prepare("INSERT INTO stickers(id,letter_id,asset_id,x,y,w,z) VALUES (?,?,?,?,?,?,?)")
+        .bind(st.id,id,st.assetId,st.x,st.y,st.w,i+1));
+    }
+    for(const assetId of removed)stmts.push(env.DB.prepare("DELETE FROM assets WHERE id=? AND letter_id=?").bind(assetId,id));
+    await env.DB.batch(stmts);
+    await Promise.allSettled(deleteKeys.map(key=>env.BUCKET.delete(key)));
+    return json({ok:true,count:data.stickers.length,removed:removed.length,added:newAssets.length});
+  }catch(cause){
+    await Promise.allSettled(uploadedKeys.map(key=>env.BUCKET.delete(key)));
+    console.error("MyLetter sticker update:",cause?.message);
+    throw Object.assign(new Error("Sticker update failed"),{code:"STICKER_UPDATE_FAILED",cause});
+  }
+}
+
 async function deleteLetter(req,env,id){
   const token=(req.headers.get("Authorization")||"").replace(/^Bearer\s+/i,"");
   if(!(/^[a-f0-9]{64}$/.test(token)))return error("관리 권한이 없어요.",403);
@@ -270,6 +371,12 @@ export default {
         return json({ok:tables.length===6&&r2==="ok",service:"MyLetter",checks:{d1Tables:tables.length,expectedTables:6,r2}},tables.length===6&&r2==="ok"?200:503);
       }
       if(path==="/api/letters"&&method==="POST")return await createLetter(req,env);
+      const manageLetter=path.match(/^\/api\/manage\/([a-f0-9]{24})$/);
+      if(manageLetter&&method==="GET")return await ownerRead(req,env,manageLetter[1]);
+      const manageStickers=path.match(/^\/api\/manage\/([a-f0-9]{24})\/stickers$/);
+      if(manageStickers&&method==="PUT")return await ownerUpdateStickers(req,env,manageStickers[1]);
+      const manageAsset=path.match(/^\/api\/manage\/([a-f0-9]{24})\/media\/([a-f0-9]{24})$/);
+      if(manageAsset&&method==="GET")return await ownerMedia(req,env,manageAsset[1],manageAsset[2]);
       const status=path.match(/^\/api\/letters\/([a-f0-9]{24})\/status$/);
       if(status&&method==="GET")return await issueStatus(env,status[1]);
       const unlockMatch=path.match(/^\/api\/letters\/([a-f0-9]{24})\/unlock$/);
