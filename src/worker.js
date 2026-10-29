@@ -4,6 +4,9 @@ const PAPERS = new Set(["classic","vintage"]);
 const COLORS = new Set(["yellow","pink","mint","blue"]);
 const MAX_BODY = 10000;
 const MAX_FILES = 21;
+// Workers production limits a single PBKDF2 operation to 100,000 iterations.
+// See https://github.com/cloudflare/workerd/issues/1346
+const PBKDF2_ITERATIONS = 100000;
 // Auto-create the initial schema for dashboard GitHub deployments, which may
 // provision D1 automatically and cannot run migration commands before deploy.
 const SCHEMA_SQL = "CREATE TABLE IF NOT EXISTS letters (\n  id TEXT PRIMARY KEY,\n  sender TEXT NOT NULL,\n  recipient TEXT NOT NULL,\n  title TEXT NOT NULL,\n  body TEXT NOT NULL,\n  font TEXT NOT NULL,\n  paper TEXT NOT NULL,\n  bg_asset TEXT,\n  password_salt TEXT,\n  password_hash TEXT,\n  available_at TEXT,\n  allow_reply INTEGER NOT NULL DEFAULT 1,\n  manage_hash TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  views INTEGER NOT NULL DEFAULT 0\n);\nCREATE TABLE IF NOT EXISTS assets (\n  id TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  r2_key TEXT NOT NULL UNIQUE,\n  mime TEXT NOT NULL,\n  bytes INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_assets_letter ON assets(letter_id);\nCREATE TABLE IF NOT EXISTS stickers (\n  id TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  asset_id TEXT NOT NULL REFERENCES assets(id) ON DELETE CASCADE,\n  x REAL NOT NULL,\n  y REAL NOT NULL,\n  w REAL NOT NULL,\n  z INTEGER NOT NULL DEFAULT 1\n);\nCREATE INDEX IF NOT EXISTS idx_stickers_letter ON stickers(letter_id);\nCREATE TABLE IF NOT EXISTS replies (\n  id TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  body TEXT NOT NULL,\n  x REAL NOT NULL DEFAULT 0.65,\n  y REAL NOT NULL DEFAULT 0.7,\n  color TEXT NOT NULL DEFAULT 'yellow',\n  author_hash TEXT NOT NULL,\n  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,\n  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP\n);\nCREATE INDEX IF NOT EXISTS idx_replies_letter ON replies(letter_id);\nCREATE TABLE IF NOT EXISTS access_sessions (\n  token_hash TEXT PRIMARY KEY,\n  letter_id TEXT NOT NULL REFERENCES letters(id) ON DELETE CASCADE,\n  expires_at INTEGER NOT NULL\n);\nCREATE INDEX IF NOT EXISTS idx_sessions_letter ON access_sessions(letter_id);\nCREATE TABLE IF NOT EXISTS login_attempts (\n  key TEXT PRIMARY KEY,\n  count INTEGER NOT NULL DEFAULT 0,\n  reset_at INTEGER NOT NULL\n);\n";
@@ -55,7 +58,7 @@ function dbReady(env){return env.DB && env.BUCKET;}
 async function passwordHash(password,saltHex){
   const salt=new Uint8Array((saltHex.match(/../g)||[]).map(x=>parseInt(x,16)));
   const key=await crypto.subtle.importKey("raw",encode(password),"PBKDF2",false,["deriveBits"]);
-  return bytesToHex(await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:150000,hash:"SHA-256"},key,256));
+  return bytesToHex(await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations:PBKDF2_ITERATIONS,hash:"SHA-256"},key,256));
 }
 function validateFile(file,max){
   if(!(file instanceof File) || file.size<1 || file.size>max)throw new Error("이미지 크기를 확인해 주세요.");
@@ -258,7 +261,7 @@ export default {
     if(!allowedOrigin(req)&&method!=="GET")return error("허용되지 않은 요청 출처예요.",403);
     try{
       await ensureSchema(env.DB);
-      if(path==="/api/health"&&method==="GET")return json({ok:true,service:"MyLetter",storage:"connected"});
+      if(path==="/api/health"&&method==="GET")return json({ok:true,service:"MyLetter",storage:"connected",version:"kdf-100k"});
       if(path==="/api/diagnostics"&&method==="GET"){
         const names=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('letters','assets','stickers','replies','access_sessions','login_attempts')").all();
         const tables=(names.results||[]).map(row=>row.name);

@@ -173,3 +173,14 @@ test("fresh D1 database initializes schema only once per Worker instance",async(
  assert.equal(r.status,200);
  assert.equal(env.DB.schemaInitCount,1);
 });
+
+// The production Workers runtime rejects PBKDF2 deriveBits iterations > 100_000.
+// Local Wrangler and Node crypto do not enforce this ceiling.
+test("production PBKDF2 iteration budget stays within the Cloudflare limit",async()=>{
+ const {readFileSync}=await import("node:fs");
+ const source=readFileSync(new URL("../src/worker.js",import.meta.url),"utf8");
+ const match=source.match(/const PBKDF2_ITERATIONS = (\d+);/);
+ assert.ok(match,"PBKDF2 iteration policy must be explicit");
+ assert.ok(Number(match[1])<=100000,"Workers rejects more than 100000 PBKDF2 iterations");
+ assert.match(source,/iterations:PBKDF2_ITERATIONS/);
+});
