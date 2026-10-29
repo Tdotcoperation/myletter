@@ -222,3 +222,9 @@ hr{border:0;border-top:1px solid #e9ded4;margin:25px 0}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}.arrival.opening .envelope-button{opacity:0}.arrival.opening .free-letter{opacity:1;transform:translateX(-50%) scaleX(1.125)}.arrival.opening .free-letter-bottom{transform:rotateX(0deg)}.reading .paper-content,.reading .decal-layer,.reading .replies-layer{opacity:1}}
 
 .preview-side .decal{pointer-events:none}
+
+/* Controls shown only in the secret management link. */
+.manage-footer{display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap;max-width:720px;margin:26px auto;padding:18px 20px;border:1px solid #e6d6c8;border-radius:16px;background:#fff9f2}
+.manage-footer p{margin:7px 0 0}
+.manage-footer .decor-controls{width:auto}
+@media(max-width:580px){.manage-footer{flex-direction:column;align-items:stretch}.manage-footer .decor-controls{justify-content:space-between}}

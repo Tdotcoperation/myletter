@@ -44,6 +44,12 @@ try {
       return {paper:z(".env-letter"),pocket:z(".env-pocket"),front:z(".env-front")};
     });
     assert.ok(layers.paper<layers.pocket&&layers.paper<layers.front,"letter must not pass through front face");
+    const bounds=await page.evaluate(()=>{
+      const envelope=document.querySelector(".envelope").getBoundingClientRect();
+      const folded=document.querySelector(".env-letter").getBoundingClientRect();
+      return {bottom:folded.bottom,envelopeBottom:envelope.bottom};
+    });
+    assert.ok(bounds.bottom<=bounds.envelopeBottom-1,"folded sheet must not stick out BELOW the sealed envelope");
     const styles=await page.evaluate(()=>({
       intro:getComputedStyle(document.querySelector(".arrival-caption")).backgroundColor,
       fold:getComputedStyle(document.querySelector(".free-letter-bottom")).transform
@@ -93,6 +99,45 @@ try {
     assert.equal(await page.locator("#replyModal").count(),0);
     assert.equal(errors.length,0,"Page errors: "+errors.join(" | "));
     console.log("PASS: "+viewport.width+"px opaque envelope, 4:3 fold, 3:4 unfold, zoom, ink/sticker fade and post-it reply");
+
+    // Secret management link: unchanged letter content, existing sticker can be
+    // repositioned/removed and new stickers added through the same editor.
+    const managerToken="a".repeat(64),assetId="c".repeat(24);
+    const managerSticker={id:"existing-sticker-123",asset_id:assetId,x:.3,y:.25,w:.22,z:1,
+      url:"/api/manage/"+id+"/media/"+assetId};
+    let savedMetadata="",seenOwnerAuth=false;
+    await page.route("**/api/manage/**",async route=>{
+      const req=route.request(),path=new URL(req.url()).pathname;
+      if(req.headers()["authorization"]!=="Bearer "+managerToken){
+        await route.fulfill({status:403,contentType:"application/json",body:JSON.stringify({error:"Forbidden"})});
+        return;
+      }
+      seenOwnerAuth=true;
+      if(path==="/api/manage/"+id&&req.method()==="GET"){
+        await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({...letter,stickers:[managerSticker],background:null})});
+      }else if(path==="/api/manage/"+id+"/media/"+assetId){
+        const png=Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9buKd7sAAAAASUVORK5CYII=","base64");
+        await route.fulfill({status:200,contentType:"image/png",body:png});
+      }else if(path==="/api/manage/"+id+"/stickers"&&req.method()==="PUT"){
+        savedMetadata=req.postData()||"";
+        await route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({ok:true,count:1,added:0,removed:0})});
+      }else{
+        await route.fulfill({status:404,body:"Not Found"});
+      }
+    });
+    await page.goto(origin+"/manage/"+id+"/"+managerToken,{waitUntil:"domcontentloaded"});
+    await page.locator("#saveDecoration").waitFor();
+    assert.equal(await page.locator("#letterPaper .letter-body").innerText(),letter.body);
+    assert.equal(await page.locator('#letterPaper .decal').count(),1);
+    assert.equal(await page.locator('textarea').count(),0,"manager cannot edit letter body");
+    assert.equal(await page.locator('input[type="text"]').count(),0,"manager cannot edit title or sender");
+    await page.locator("#saveDecoration").click();
+    await page.locator("#saveDecoration").waitFor();
+    assert.ok(seenOwnerAuth,"management API must use owner authorization");
+    assert.match(savedMetadata,/existing-sticker-123/,"sticker arrangement should be sent");
+    assert.equal(errors.length,0,"Manager errors: "+errors.join(" | "));
+    console.log("PASS: "+viewport.width+"px read-only letter and authorized sticker management");
+
     await page.close();
   }
 }finally{
