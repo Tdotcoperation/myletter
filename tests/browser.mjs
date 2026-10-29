@@ -8,7 +8,7 @@ const letter={
   id,sender:"하치",recipient:"친구",title:"편지가 도착했어요",
   body:"오늘 하루도 좋은 하루 보내!\n고마워.",
   font:"pretendard",paper:"classic",allowReply:true,
-  background:null,stickers:[],replies:[]
+  background:null,stickers:[{id:"decor-1",url:"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9buKd7sAAAAASUVORK5CYII=",x:0.12,y:0.12,w:0.16,z:1}],replies:[]
 };
 const browser=await chromium.launch({headless:true,args:["--no-sandbox"]});
 try {
@@ -49,11 +49,42 @@ try {
       fold:getComputedStyle(document.querySelector(".free-letter-bottom")).transform
     }));
     assert.match(styles.intro,/rgba?\(/);
+    // The folded paper itself must be landscape 4:3 inside an opaque envelope.
+    const folded=await envelope.locator(".env-letter").boundingBox();
+    assert.ok(Math.abs(folded.width/folded.height-4/3)<.03,"folded page must be 4:3");
     await envelope.click();
     await page.locator(".arrival.opening").waitFor();
+    await page.waitForTimeout(160);
+    const opacity=await envelope.evaluate(el=>getComputedStyle(el).opacity);
+    assert.equal(opacity,"1","click must NOT fade the envelope via disabled opacity");
+    assert.equal(await envelope.isDisabled(),false,"opening should not disable the button");
+    await page.waitForTimeout(3180);
+    const foldRect=await page.locator(".free-letter-top").boundingBox();
+    assert.ok(Math.abs(foldRect.width/foldRect.height-4/3)<.1,"released folded page should be 4:3 before unfolding");
+    await page.waitForTimeout(1390);
+    const openRatio=await page.evaluate(()=>{
+      const first=document.querySelector(".free-letter-top").getBoundingClientRect();
+      const second=document.querySelector(".free-letter-bottom").getBoundingClientRect();
+      return first.width/(first.height+second.height);
+    });
+    assert.ok(Math.abs(openRatio-.75)<.07,"unfolded sheet should be portrait 3:4; got "+openRatio);
     await page.locator(".reading #addReply").waitFor({timeout:14000});
     const animation=await page.locator(".reading").evaluate(el=>getComputedStyle(el).animationName);
-    assert.equal(animation,"reading-fade-in","reading must not flip the entire card");
+    assert.equal(animation,"reading-grow","reading must enlarge, never flip like a card");
+    const initialContent=await page.locator(".reading .paper-content").evaluate(el=>parseFloat(getComputedStyle(el).opacity));
+    assert.ok(initialContent<.25,"text must be hidden while paper is growing");
+    await page.locator(".reading.content-visible").waitFor({timeout:5000});
+    await page.waitForTimeout(850);
+    const final=await page.evaluate(()=>{
+      const letter=document.querySelector(".reading .paper").getBoundingClientRect();
+      return {
+        ratio:letter.width/letter.height,
+        text:parseFloat(getComputedStyle(document.querySelector(".reading .paper-content")).opacity),
+        sticker:parseFloat(getComputedStyle(document.querySelector(".reading .decal-layer")).opacity)
+      };
+    });
+    assert.ok(Math.abs(final.ratio-.75)<.07,"expanded reading paper should be 3:4; got "+final.ratio);
+    assert.ok(final.text>.95&&final.sticker>.95,"text and stickers should fade in after expanding");
     await page.locator("#addReply").click({timeout:5000});
     await page.locator("#replyBody").waitFor();
     await page.locator("#replyBody").fill("이건 댓글이 아닌 포스트잇 답장이야!");
@@ -61,7 +92,7 @@ try {
     await page.locator('.postit[data-reply="bbbbbbbbbbbbbbbbbbbbbbbb"]').waitFor();
     assert.equal(await page.locator("#replyModal").count(),0);
     assert.equal(errors.length,0,"Page errors: "+errors.join(" | "));
-    console.log("PASS: "+viewport.width+"px envelope layering, unfolded page and clickable reply/post-it");
+    console.log("PASS: "+viewport.width+"px opaque envelope, 4:3 fold, 3:4 unfold, zoom, ink/sticker fade and post-it reply");
     await page.close();
   }
 }finally{
