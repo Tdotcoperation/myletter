@@ -25,3 +25,15 @@ jobs:
             sleep 2
           done
           node tests/smoke.mjs
+
+  remote-health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe live custom domain without modifying production data
+        shell: bash
+        run: |
+          for endpoint in /api/health /api/diagnostics; do
+            echo "== $endpoint ==";
+            curl --max-time 12 -sS -w '\nHTTP %{http_code}\n' "https://myletter.imtdot.kr$endpoint" || true;
+            echo;
+          done

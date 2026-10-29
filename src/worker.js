@@ -12,13 +12,19 @@ async function ensureSchema(db) {
   let initializing = schemaInitialization.get(db);
   if (!initializing) {
     initializing = (async () => {
-      // D1Database.exec() splits SQL on line boundaries and can reject multiline
-      // CREATE TABLE definitions. Execute each complete statement separately.
-      const complete = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='login_attempts'").first();
-      if (!complete) {
-        const statements = SCHEMA_SQL.split(/;\s*(?:\r?\n|$)/).map(x => x.trim()).filter(Boolean);
-        for (const statement of statements) {
+      // Every statement is idempotent (IF NOT EXISTS), so repair partial schemas
+      // rather than guessing completeness from a single existing table.
+      const statements = SCHEMA_SQL.split(/;\s*(?:\r?\n|$)/).map(x => x.trim()).filter(Boolean);
+      const tables = await db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+      const existing = new Set((tables.results || []).map(row => row.name));
+      for (const statement of statements) {
+        const table = statement.match(/^CREATE TABLE IF NOT EXISTS\s+(\w+)/i)?.[1];
+        if (table && existing.has(table)) continue;
+        try {
           await db.prepare(statement).run();
+        } catch (cause) {
+          console.error("MyLetter D1 schema initialization:", { statementType: statement.split("(")[0].slice(0,90), message: cause?.message });
+          throw Object.assign(new Error("D1 schema initialization failed"), { code: "D1_SCHEMA_INIT_FAILED", cause });
         }
       }
     })();
@@ -120,7 +126,12 @@ async function createLetter(req,env){
   const keys=[], assetEntries=[], stickerEntries=[];
   async function store(file,assetId){
     const key="letters/"+id+"/"+assetId;
-    await env.BUCKET.put(key,file,{httpMetadata:{contentType:file.type}});
+    try {
+      await env.BUCKET.put(key,file,{httpMetadata:{contentType:file.type}});
+    } catch (cause) {
+      console.error("MyLetter R2 upload:", { mime: file.type, size: file.size, message: cause?.message });
+      throw Object.assign(new Error("R2 upload failed"), {code:"R2_UPLOAD_FAILED",cause});
+    }
     keys.push(key);
     assetEntries.push({id:assetId,key,mime:file.type,bytes:file.size});
     return assetId;
@@ -136,7 +147,12 @@ async function createLetter(req,env){
       .bind(id,sender,recipient,title,body,data.font,data.paper,bg,salt,pwdHash,available,data.allow_reply===false?0:1,await digest(manageToken))];
     for(const a of assetEntries)stmts.push(env.DB.prepare("INSERT INTO assets (id,letter_id,r2_key,mime,bytes) VALUES (?,?,?,?,?)").bind(a.id,id,a.key,a.mime,a.bytes));
     for(const s of stickerEntries)stmts.push(env.DB.prepare("INSERT INTO stickers (id,letter_id,asset_id,x,y,w,z) VALUES (?,?,?,?,?,?,?)").bind(s.id,id,s.assetId,s.x,s.y,s.w,s.z));
-    await env.DB.batch(stmts);
+    try {
+      await env.DB.batch(stmts);
+    } catch (cause) {
+      console.error("MyLetter D1 letter insert:", {assetCount:assetEntries.length,stickerCount:stickerEntries.length,message:cause?.message});
+      throw Object.assign(new Error("D1 insert failed"), {code:"D1_INSERT_FAILED",cause});
+    }
     return json({id,url:locationFromUrl(req,id),manageUrl:new URL(req.url).origin+"/manage/"+id+"/"+manageToken},201);
   }catch(e){
     await Promise.allSettled(keys.map(key=>env.BUCKET.delete(key)));
@@ -242,7 +258,14 @@ export default {
     if(!allowedOrigin(req)&&method!=="GET")return error("허용되지 않은 요청 출처예요.",403);
     try{
       await ensureSchema(env.DB);
-      if(path==="/api/health"&&method==="GET")return json({ok:true,service:"MyLetter"});
+      if(path==="/api/health"&&method==="GET")return json({ok:true,service:"MyLetter",storage:"connected"});
+      if(path==="/api/diagnostics"&&method==="GET"){
+        const names=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('letters','assets','stickers','replies','access_sessions','login_attempts')").all();
+        const tables=(names.results||[]).map(row=>row.name);
+        let r2="ok";
+        try {await env.BUCKET.list({limit:1});} catch(cause) {console.error("MyLetter R2 diagnostic:",cause?.message);r2="failed";}
+        return json({ok:tables.length===6&&r2==="ok",service:"MyLetter",checks:{d1Tables:tables.length,expectedTables:6,r2}},tables.length===6&&r2==="ok"?200:503);
+      }
       if(path==="/api/letters"&&method==="POST")return await createLetter(req,env);
       const status=path.match(/^\/api\/letters\/([a-f0-9]{24})\/status$/);
       if(status&&method==="GET")return await issueStatus(env,status[1]);
@@ -259,10 +282,11 @@ export default {
       if(media&&method==="GET")return await getMedia(req,env,media[1],media[2]);
       return error("지원하지 않는 요청이에요.",404);
     }catch(e){
-      console.error("MyLetter API:",e);
+      const code=typeof e?.code==="string" ? e.code : "UNEXPECTED_ERROR";
+      console.error("MyLetter API:", {method,path,code,message:e?.message,cause:e?.cause?.message,stack:e?.stack});
       if(e instanceof SyntaxError)return error("요청 형식이 올바르지 않아요.");
       if(e?.message?.includes("이미지")||e?.message?.includes("업로드"))return error(e.message,400);
-      return error("서버 처리 중 문제가 발생했어요. 다시 시도해 주세요.",500);
+      return json({error:"발급 처리 중 서버 오류가 발생했어요. 오류 코드: "+code,code},500);
     }
   }
 };

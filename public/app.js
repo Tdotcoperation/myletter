@@ -25,7 +25,7 @@ function toast(msg){const el=$("#toast");el.textContent=msg;el.classList.add("sh
 async function api(path,opts={}){
  const response=await fetch(path,{credentials:"same-origin",cache:"no-store",...opts});
  const data=await response.json().catch(()=>({error:"서버 응답을 처리할 수 없어요."}));
- if(!response.ok)throw new Error(data.error||"문제가 발생했어요.");
+ if(!response.ok)throw new Error(data.error||("요청 오류 (HTTP "+response.status+")"));
  return data;
 }
 function brand(){return '<header class="topbar"><a class="brand" href="/"><span class="brand-icon">✉</span> MyLetter</a><span class="top-note">마음을 전하는 작은 편지</span></header>';}
