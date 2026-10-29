@@ -26,6 +26,9 @@ class FakeDB {
       throw new Error("Unmocked first: "+sql);
     };
     const all=async()=>{
+      if(sql.startsWith("SELECT name FROM sqlite_master")){
+        return {results:this.schemaReady?["letters","assets","stickers","replies","access_sessions","login_attempts"].map(name=>({name})):[]};
+      }
       if(sql.startsWith("SELECT id,asset_id,x,y,w,z FROM stickers")){
         return {results:[...this.stickers.values()].filter(s=>s.letter_id===args[0]).sort((a,b)=>a.z-b.z)};
       }
