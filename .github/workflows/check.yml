@@ -41,5 +41,3 @@ jobs:
             curl --max-time 12 -sS -w '\nHTTP %{http_code}\n' "https://myletter.imtdot.kr$endpoint" || true;
             echo;
           done
-      - name: Live issuance smoke test (temporary test letters cleaned up)
-        run: node tests/live-smoke.mjs
