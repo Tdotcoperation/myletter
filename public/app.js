@@ -5,7 +5,7 @@ const app=$("#app");
 const fontList=[
   {id:"pretendard",name:"Pretendard",desc:"단정하고 편안한 서체"},
   {id:"wanted",name:"Wanted Sans",desc:"부드럽고 현대적인 서체"},
-  {id:"seoyun",name:"홍국생명 이서윤체",desc:"다정한 손글씨 느낌"},
+  {id:"seoyun",name:"흥국생명 이서윤체",desc:"다정한 손글씨 느낌"},
   {id:"hippie",name:"AI올컷 히피체",desc:"재미있고 자유로운 느낌"}
 ];
 const defaults={recipient:"",title:"",body:"",sender:"",font:"pretendard",paper:"classic",passwordEnabled:false,password:"",dateEnabled:false,availableLocal:"",allowReply:true};
@@ -63,7 +63,7 @@ function renderCompose(){
 function renderStyle(){
  const choices=fontList.map(f=>'<button class="choice '+(draft.font===f.id?"active":"")+'" data-font="'+f.id+'" aria-pressed="'+(draft.font===f.id)+'"><div class="choice-preview font-'+f.id+'">마음을 전해요</div><strong>'+safe(f.name)+'</strong><span>'+safe(f.desc)+'</span></button>').join("");
  const papers=[{id:"classic",name:"기본 편지지",desc:"부드러운 크림색 종이"},{id:"vintage",name:"빈티지 편지",desc:"빛바랜 오래된 종이"}].map(p=>'<button class="choice '+(draft.paper===p.id?"active":"")+'" data-paper="'+p.id+'"><div class="paper-swatch '+p.id+'"></div><strong style="margin-top:8px">'+p.name+'</strong><span>'+p.desc+'</span></button>').join("");
- app.innerHTML=wizardFrame('<p class="group-label">글꼴 선택</p><div class="choice-grid">'+choices+'</div><p class="hint">일부 손글씨 폰트는 라이선스를 확인하여 별도 웹폰트를 설치해야 실제 글꼴로 표시됩니다.</p><p class="group-label" style="margin-top:28px">편지지 테마</p><div class="choice-grid">'+papers+'</div>'+actions(),"글꼴과 종이 질감으로 편지의 분위기를 정해 보세요.");
+ app.innerHTML=wizardFrame('<p class="group-label">글꼴 선택</p><div class="choice-grid">'+choices+'</div><p class="hint">교보 손글씨 이유빈체는 별도 사용 권한을 확인한 뒤 추가하는 글꼴입니다.</p><p class="group-label" style="margin-top:28px">편지지 테마</p><div class="choice-grid">'+papers+'</div>'+actions(),"글꼴과 종이 질감으로 편지의 분위기를 정해 보세요.");
  $$("[data-font]").forEach(el=>el.addEventListener("click",()=>{draft.font=el.dataset.font;store();renderStyle();}));
  $$("[data-paper]").forEach(el=>el.addEventListener("click",()=>{draft.paper=el.dataset.paper;store();renderStyle();}));
  bindSteps();

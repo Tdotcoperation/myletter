@@ -1,8 +1,8 @@
 
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css');
 @import url('https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.1/packages/wanted-sans/fonts/webfonts/variable/split/WantedSansVariable.min.css');
-@font-face{font-family:Seoyun;src:url('/fonts/seoyun.woff2') format('woff2');font-display:swap}
-@font-face{font-family:Hippie;src:url('/fonts/hippie.woff2') format('woff2');font-display:swap}
+@font-face{font-family:Seoyun;src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2202-2@1.0/LeeSeoyun.woff') format('woff');font-display:swap}
+@font-face{font-family:Hippie;src:url('https://cdn.jsdelivr.net/gh/Project-Noonnu/2610081905@hippie/hippie/hippie_히피체.woff2') format('woff2');font-display:swap}
 @font-face{font-family:KyoboYubin;src:url('/fonts/kyobo-yubin.woff2') format('woff2');font-display:swap}
 :root{font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Noto Sans KR",sans-serif;color:#392f2c;background:#eeeae5;font-synthesis:none;--accent:#937365;--paper:#fffaf0}
 *{box-sizing:border-box}
