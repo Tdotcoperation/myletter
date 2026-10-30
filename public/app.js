@@ -114,7 +114,7 @@ function bindSteps(){
  });
 }
 function validImage(file,max){
- if(!file.type.startsWith("image/")||!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type))return toast("JPG, PNG, GIF, WebP 이미지만 사용할 수 있어요."),false;
+ if(!["image/jpeg","image/png","image/webp","image/gif"].includes(file.type))return toast("JPG, PNG, WebP 및 움직이는 GIF만 올릴 수 있어요."),false;
  if(file.size>max||file.size<1)return toast("이미지 크기가 제한을 넘었어요."),false;
  return true;
 }
@@ -126,12 +126,12 @@ function addStickerFiles(files){
    const id=crypto.randomUUID().replace(/-/g,"");
    stickers.push({id,file,preview:URL.createObjectURL(file),x:0.18+(stickers.length%4)*0.17,y:0.2+(stickers.length%4)*0.13,w:0.22,z:stickers.length+1});changed=true;
  }
- if(changed)renderDecorator();
+ if(changed){renderDecorator();if(Array.from(files).some(f=>f.type==="image/gif"))toast("움직이는 GIF가 추가됐어요! 편지를 열면 계속 반복 재생돼요.");}
 }
 function renderDecorator(){
  const managing=Boolean(manageContext);
  const editingLetter=managing?{...manageContext.letter,allowReply:false,replies:[]}:draft;
- app.innerHTML='<div class="decor-shell">'+brand()+'<div class="decor-bar"><div><div class="smallcaps">DECORATE YOUR LETTER</div><h1 style="margin:9px 0 2px">'+(managing?'발급된 편지 스티커 수정':'내 편지 꾸미기')+'</h1></div><div class="decor-controls"><label class="btn btn-small">＋ 스티커 업로드 <input type="file" id="stickerFiles" accept="image/jpeg,image/png,image/webp,image/gif" multiple hidden></label><button class="btn btn-small btn-ghost" id="deleteSticker">선택 삭제</button><button class="btn btn-primary btn-small" id="saveDecoration">'+(managing?'변경사항 저장':'완료 ✓')+'</button></div></div><p class="decor-help">'+(managing?'보내는 사람·받는 사람·제목·본문은 발급 당시 내용으로 고정됩니다. 스티커는 추가·이동·삭제만 할 수 있어요. <strong>변경사항 저장</strong>을 눌러야 친구에게 반영됩니다.':'이미지를 드래그 앤 드롭으로 편지지에 올리거나 업로드해 보세요. 스티커를 누른 채로 움직이고, PC에서는 선택 후 D 키로 삭제할 수 있어요. 모바일에서는 선택 삭제 버튼을 사용해요.')+'</p><div class="decor-stage"><div class="paper-frame">'+paperHTML(editingLetter,true)+'</div></div>'+(managing?'<div class="manage-footer"><div><strong>관리 링크 전용</strong><p class="hint">편지 내용과 이미지는 공개되지 않도록 비밀 관리 링크를 보관하세요.</p></div><div class="decor-controls"><a class="btn btn-small btn-ghost" href="/l/'+manageContext.id+'">받는 사람 화면</a><button class="btn btn-danger btn-small" id="deleteLetter">편지 영구 삭제</button></div></div>':'<p class="footer-note">완료를 누르면 배치한 스티커의 위치가 발급할 편지에 적용돼요.</p>')+'</div>';
+ app.innerHTML='<div class="decor-shell">'+brand()+'<div class="decor-bar"><div><div class="smallcaps">DECORATE YOUR LETTER</div><h1 style="margin:9px 0 2px">'+(managing?'발급된 편지 스티커 수정':'내 편지 꾸미기')+'</h1></div><div class="decor-controls"><label class="btn btn-small">＋ 스티커 업로드 <input type="file" id="stickerFiles" accept="image/jpeg,image/png,image/webp,image/gif,.gif" multiple hidden></label><button class="btn btn-small btn-ghost" id="deleteSticker">선택 삭제</button><button class="btn btn-primary btn-small" id="saveDecoration">'+(managing?'변경사항 저장':'완료 ✓')+'</button></div></div><p class="decor-help">'+(managing?'보내는 사람·받는 사람·제목·본문은 발급 당시 내용으로 고정됩니다. 스티커는 이미지와 GIF 모두 추가·이동·삭제할 수 있어요. GIF는 편지 열람 중 계속 재생됩니다. <strong>변경사항 저장</strong>을 눌러야 친구에게 반영됩니다.':'이미지를 드래그 앤 드롭으로 편지지에 올리거나 업로드해 보세요. 스티커를 누른 채로 움직이고, PC에서는 선택 후 D 키로 삭제할 수 있어요. 모바일에서는 선택 삭제 버튼을 사용해요. GIF 파일도 올릴 수 있으며 편지를 연 뒤 계속 반복 재생돼요.')+'</p><div class="decor-stage"><div class="paper-frame">'+paperHTML(editingLetter,true)+'</div></div>'+(managing?'<div class="manage-footer"><div><strong>관리 링크 전용</strong><p class="hint">편지 내용과 이미지는 공개되지 않도록 비밀 관리 링크를 보관하세요.</p></div><div class="decor-controls"><a class="btn btn-small btn-ghost" href="/l/'+manageContext.id+'">받는 사람 화면</a><button class="btn btn-danger btn-small" id="deleteLetter">편지 영구 삭제</button></div></div>':'<p class="footer-note">완료를 누르면 배치한 스티커의 위치가 발급할 편지에 적용돼요.</p>')+'</div>';
  $("#stickerFiles").addEventListener("change",e=>{addStickerFiles(e.target.files);e.target.value="";});
  $("#saveDecoration").addEventListener("click",()=>{
    if(managing)saveManagedStickers();

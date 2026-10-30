@@ -85,3 +85,47 @@ const cleanup=await request("/api/letters/"+ownerId,{method:"DELETE",headers});
 assert.equal(cleanup.res.status,200);
 console.log("Success: authenticated owner manages image stickers without modifying letter content.");
 
+// Animated GIF retains its frame data and is served with infinite loops,
+// even if its original NETSCAPE2.0 extension specifies a finite repeat count.
+const animatedGif=Uint8Array.from(Buffer.from("R0lGODlhAwADAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwECAAAh+QQACAAAACwAAAAAAwADAAAIBwABCBw4MCAAIfkEAAgAAAAsAAAAAAMAAwCBAAD/AAAAAAAAAAAACAcAAQgcODAgADs=","base64"));
+function readLoop(bytes){
+ const pos=Buffer.from(bytes).indexOf(Buffer.from("NETSCAPE2.0"));
+ return pos<0 ? null : bytes[pos+13]+256*bytes[pos+14];
+}
+const gifId="gif-"+crypto.randomUUID().slice(0,10);
+const gifForm=new FormData();
+gifForm.set("data",JSON.stringify({
+ sender:"GIF",recipient:"친구",title:"움직이는 편지",body:"GIF 스티커 테스트",
+ font:"pretendard",paper:"classic",allow_reply:true,
+ stickers:[{id:gifId,x:.3,y:.5,w:.2}]
+}));
+gifForm.set("sticker_"+gifId,new File([animatedGif],"animated.gif",{type:"image/gif"}));
+const gifIssue=await request("/api/letters",{method:"POST",body:gifForm});
+assert.equal(gifIssue.res.status,201,"animated GIF sticker should be accepted");
+const gifLetter=await request("/api/letters/"+gifIssue.json.id);
+assert.equal(gifLetter.res.status,200);
+const gifMedia=await fetch(ROOT+gifLetter.json.stickers[0].url);
+assert.equal(gifMedia.status,200);
+assert.equal(gifMedia.headers.get("content-type"),"image/gif");
+const gifBytes=new Uint8Array(await gifMedia.arrayBuffer());
+assert.equal(readLoop(gifBytes),0,"shared GIF should loop forever");
+const gifOwner=gifIssue.json.manageUrl.split("/").pop();
+const ownerMedia=await fetch(ROOT+"/api/manage/"+gifIssue.json.id+"/media/"+gifLetter.json.stickers[0].asset_id,{headers:{Authorization:"Bearer "+gifOwner}});
+assert.equal(ownerMedia.status,200);
+assert.equal(readLoop(new Uint8Array(await ownerMedia.arrayBuffer())),0,"managed GIF should loop forever");
+const addGifForm=new FormData();
+const anotherId="another-"+crypto.randomUUID().slice(0,12);
+addGifForm.set("data",JSON.stringify({stickers:[{id:anotherId,x:.15,y:.1,w:.18}]}));
+addGifForm.set("sticker_"+anotherId,new File([animatedGif],"second.gif",{type:"image/gif"}));
+const updateGif=await request("/api/manage/"+gifIssue.json.id+"/stickers",{method:"PUT",headers:{Authorization:"Bearer "+gifOwner},body:addGifForm});
+assert.equal(updateGif.res.status,200,"managed letter accepts new GIF sticker");
+const updatedGif=await request("/api/letters/"+gifIssue.json.id);
+assert.equal(updatedGif.json.stickers.length,1);
+const updatedMedia=await fetch(ROOT+updatedGif.json.stickers[0].url);
+assert.equal(updatedMedia.headers.get("content-type"),"image/gif");
+assert.equal(readLoop(new Uint8Array(await updatedMedia.arrayBuffer())),0);
+const gifDelete=await request("/api/letters/"+gifIssue.json.id,{method:"DELETE",headers:{Authorization:"Bearer "+gifOwner}});
+assert.equal(gifDelete.res.status,200);
+console.log("Success: animated GIF stickers loop infinitely at creation, owner editing and recipient viewing.");
+
+
