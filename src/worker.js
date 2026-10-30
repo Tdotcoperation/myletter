@@ -1,3 +1,4 @@
+import {ensureGifInfiniteLoop, normalizeUploadedGif} from "./gif.js";
 
 const FONTS = new Set(["pretendard","wanted","seoyun","hippie"]);
 const PAPERS = new Set(["classic","vintage"]);
@@ -129,14 +130,15 @@ async function createLetter(req,env){
   const keys=[], assetEntries=[], stickerEntries=[];
   async function store(file,assetId){
     const key="letters/"+id+"/"+assetId;
+    const saved=await normalizeUploadedGif(file);
     try {
-      await env.BUCKET.put(key,file,{httpMetadata:{contentType:file.type}});
+      await env.BUCKET.put(key,saved,{httpMetadata:{contentType:file.type}});
     } catch (cause) {
       console.error("MyLetter R2 upload:", { mime: file.type, size: file.size, message: cause?.message });
       throw Object.assign(new Error("R2 upload failed"), {code:"R2_UPLOAD_FAILED",cause});
     }
     keys.push(key);
-    assetEntries.push({id:assetId,key,mime:file.type,bytes:file.size});
+    assetEntries.push({id:assetId,key,mime:file.type,bytes:saved.size});
     return assetId;
   }
   try{
@@ -210,7 +212,8 @@ async function getMedia(req,env,id,assetId){
   if(!a)return error("이미지를 찾을 수 없어요.",404);
   const object=await env.BUCKET.get(a.r2_key);
   if(!object)return error("이미지를 찾을 수 없어요.",404);
-  return new Response(object.body,{headers:{"Content-Type":a.mime,"Cache-Control":"private,no-store","X-Content-Type-Options":"nosniff","Cross-Origin-Resource-Policy":"same-origin","Content-Security-Policy":"default-src 'none'; sandbox"}});
+  return new Response(a.mime==="image/gif"?
+    ensureGifInfiniteLoop(new Uint8Array(await object.arrayBuffer())):object.body,{headers:{"Content-Type":a.mime,"Cache-Control":"private,no-store","X-Content-Type-Options":"nosniff","Cross-Origin-Resource-Policy":"same-origin","Content-Security-Policy":"default-src 'none'; sandbox"}});
 }
 async function createReply(req,env,id){
   const letter=await getLetter(env,id);
@@ -271,7 +274,8 @@ async function ownerMedia(req,env,id,assetId){
   if(!a)return error("이미지를 찾을 수 없어요.",404);
   const object=await env.BUCKET.get(a.r2_key);
   if(!object)return error("이미지를 찾을 수 없어요.",404);
-  return new Response(object.body,{headers:{
+  return new Response(a.mime==="image/gif"?
+    ensureGifInfiniteLoop(new Uint8Array(await object.arrayBuffer())):object.body,{headers:{
     "Content-Type":a.mime,"Cache-Control":"private,no-store",
     "X-Content-Type-Options":"nosniff","Cross-Origin-Resource-Policy":"same-origin",
     "Content-Security-Policy":"default-src 'none'; sandbox"
@@ -314,9 +318,10 @@ async function ownerUpdateStickers(req,env,id){
   try{
     for(const {st,file} of newFiles){
       const assetId=rand(12),key="letters/"+id+"/"+assetId;
-      await env.BUCKET.put(key,file,{httpMetadata:{contentType:file.type}});
+      const saved=await normalizeUploadedGif(file);
+      await env.BUCKET.put(key,saved,{httpMetadata:{contentType:file.type}});
       uploadedKeys.push(key);
-      newAssets.push({id:assetId,key,mime:file.type,bytes:file.size});
+      newAssets.push({id:assetId,key,mime:file.type,bytes:saved.size});
       updated.push({...st,assetId});
     }
     const keep=new Set(updated.map(s=>s.id));
